@@ -1,0 +1,9 @@
+ebean:
+  migration:
+    run: true
+
+datasource:
+  db:
+    username: qhacks
+    password: qhacks
+    url: "jdbc:postgresql://0.0.0.0:5432/qhacks"
