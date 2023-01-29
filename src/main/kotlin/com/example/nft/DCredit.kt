@@ -10,7 +10,7 @@ class DCredit(
     val tokenId: String,
     @ManyToOne
     var owner: DUser,
-    var available: Boolean = false,
+    var available: Boolean = true,
     var value: Long
 ): AbstractIdEntity() {
 }

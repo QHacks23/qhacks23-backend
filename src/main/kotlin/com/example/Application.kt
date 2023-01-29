@@ -6,6 +6,7 @@ import com.example.login.LoginRepositoryImpl
 import com.example.nft.NftManagerImpl
 import com.example.nft.Supply
 import com.example.nft.Treasury
+import com.example.nft.fsRoutes
 import io.ktor.server.plugins.cors.*
 import com.example.nft.nftRoutes
 import com.example.plugins.configureRouting
@@ -78,7 +79,7 @@ fun Application.configureRouting(config : Config, client: Client) {
     val treasuryKey = PrivateKey.generateED25519()
     val treasuryPublicKey = treasuryKey.publicKey
 
-    val treasuryAccount = AccountCreateTransaction().setKey(treasuryPublicKey).setInitialBalance(Hbar(100)).execute(client)
+    val treasuryAccount = AccountCreateTransaction().setKey(treasuryPublicKey).setInitialBalance(Hbar(101)).execute(client)
     val treasuryAccountId = treasuryAccount.getReceipt(client).accountId ?: throw Exception("Could not get treasury account id")
     val treasury = Treasury(treasuryKey, treasuryAccountId)
 
@@ -93,8 +94,9 @@ fun Application.configureRouting(config : Config, client: Client) {
         get("/health") {
             call.respondText("OK", status = HttpStatusCode.OK)
         }
-        userRoutes(userManager, userRepository)
+        userRoutes(userManager, userRepository, client)
         nftRoutes(nftManager, userRepository)
+        fsRoutes()
     }
 }
 

@@ -23,15 +23,15 @@ data class HttpPostSell(val userId : String, val tokenId: String,  val mnemonic:
 @Serializable
 data class HttpPostBuyOrder(val userId: String, val tokenId: String,  val mnemonic: String)
 @Serializable
-data class HttpGetSales(val tokenIds: List<String>)
+data class HttpGetSales(val tokenIds: List<HttpNftQuery>)
 @Serializable
-data class HttpGetBuyOrders(val tokenIds: List<String>)
+data class HttpGetBuyOrders(val tokenIds: List<HttpNftQuery>)
 @Serializable
 data class HttpGetBuyAndSell(val buyOrders: HttpGetBuyOrders, val sellOpportunities: HttpGetSales)
 @Serializable
 data class HttpNftQuerys(val nft: List<HttpNftQuery>)
 @Serializable
-data class HttpNftQuery(val token: String, val body: String, val accountId: String)
+data class HttpNftQuery(val token: String, val body: String, val accountId: String, val timeOfMint: Long)
 fun Route.nftRoutes(nftManager: NftManager, userRepository: UserRepository) {
     route("/credit") {
         post("/create"){
@@ -69,10 +69,13 @@ fun Route.nftRoutes(nftManager: NftManager, userRepository: UserRepository) {
 
         get("/orders"){
             val id = call.request.queryParameters["id"] ?: return@get call.respondText("User id was null", status = HttpStatusCode.BadRequest)
-            val user = userRepository.getByFirebaseId(id) ?: return@get call.respondText("User could not be resolved from id: ${id}", status = HttpStatusCode.BadRequest)
+            val user = userRepository.getByFirebaseId(id) ?: return@get call.respondText("User could not be resolved from id: $id", status = HttpStatusCode.BadRequest)
             val buyOrders = nftManager.getMyBuyOrders(user)
             val availableSales = nftManager.getMyAvailableOrders(user)
-            call.respond(HttpGetBuyAndSell(HttpGetBuyOrders(buyOrders), HttpGetSales(availableSales)))
+            call.respond(HttpGetBuyAndSell(
+                HttpGetBuyOrders(
+                    buyOrders.map { HttpNftQuery(it.token, it.body, it.accountId, it.time) }),
+                HttpGetSales(availableSales.map { HttpNftQuery(it.token, it.body, it.accountId, it.time) })))
         }
 
         post("/sell"){
@@ -82,9 +85,17 @@ fun Route.nftRoutes(nftManager: NftManager, userRepository: UserRepository) {
             call.respondText("Nft was sold from ${seller.firstName} to X", status = HttpStatusCode.OK)
         }
 
-        get("/available"){
-           val available = nftManager.getAllAvailable()
-            call.respond(HttpNftQuerys(available.map { HttpNftQuery(it.token, it.body, it.accountId) }))
+        get("/user"){
+            val id = call.request.queryParameters["id"] ?: return@get call.respondText("User id was null", status = HttpStatusCode.BadRequest)
+            val user = userRepository.getByFirebaseId(id) ?: return@get call.respondText("User could not be resolved from id", status = HttpStatusCode.BadRequest)
+            val available = nftManager.getMyNft(user)
+            call.respond(HttpNftQuerys(available.map { HttpNftQuery(it.token, it.body, it.accountId, it.time) }))
         }
+
+        get("/available"){
+            val available = nftManager.getAllAvailable()
+            call.respond(HttpNftQuerys(available.map { HttpNftQuery(it.token, it.body, it.accountId, it.time) }))
+        }
+
     }
 }

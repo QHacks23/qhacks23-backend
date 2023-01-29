@@ -16,9 +16,10 @@ interface NftManager {
             class BuyOrderDNE(message: String) : Error(message)
         }
     }
+    fun getMyNft(user: DUser): List<NftQuery>
     fun getAllAvailable(): List<NftQuery>
-    fun getMyAvailableOrders(seller: DUser): List<String>
-    fun getMyBuyOrders(buyer: DUser): List<String>
+    fun getMyAvailableOrders(seller: DUser): List<NftQuery>
+    fun getMyBuyOrders(buyer: DUser): List<NftQuery>
     fun createBuyOrder(buyer: DUser, tokenId: String, buyerKey: Mnemonic): Result
     fun createNft(): TokenId
     fun mintNft(credit: String, tokenId: TokenId, user: DUser, userKey: String, cost: Long)

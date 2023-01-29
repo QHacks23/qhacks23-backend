@@ -26,12 +26,13 @@ private val logger = KotlinLogging.logger { }
 data class UserBalance(val cids: List<Nft>, val hbar: String)
 data class Nft(val token: String, val count: Long, val body: String, val availability: Boolean)
 
-data class NftQuery(val token: String, val body: String, val accountId: String)
+data class NftQuery(val token: String, val body: String, val accountId: String, val time: Long)
 class NftManagerImpl(val treasury: Treasury, val supply: Supply, val client: Client): NftManager {
 
     private val buyOrders = mutableMapOf<String, Pair<DUser, Mnemonic>>()
     override fun createBuyOrder(buyer: DUser, tokenId: String, buyerKey: Mnemonic): NftManager.Result {
         val nft = QDCredit().tokenId.eq(tokenId).findOne() ?: return NftManager.Result.Error.TokenNFS("This token does not exits")
+        if(nft.owner == buyer) return NftManager.Result.Error.TokenNFS("This token is already owned by u!")
         if (nft.tokenId != tokenId || !nft.available) return NftManager.Result.Error.TokenNFS("This token is not for sale at the moment!")
         val assoc = TokenAssociateTransaction().setAccountId(AccountId.fromString(buyer.accountId))
             .setTokenIds(Collections.singletonList(TokenId.fromString(tokenId))).freezeWith(client)
@@ -85,7 +86,7 @@ class NftManagerImpl(val treasury: Treasury, val supply: Supply, val client: Cli
             .freezeWith(client).sign(treasury.treasuryKey)
         val execTransfer = tokenTransferTx.execute(client)
         execTransfer.getReceipt(client)
-        val updatedCredit = DCredit(tokenId.toString(), user, false, 1)
+        val updatedCredit = DCredit(tokenId.toString(), user, true, 1)
         updatedCredit.save()
         user.credits.add(updatedCredit)
         logger.info("Created and transferred NFT to ${user.firstName}")
@@ -99,13 +100,23 @@ class NftManagerImpl(val treasury: Treasury, val supply: Supply, val client: Cli
         }
     }
 
-    override fun getMyBuyOrders(buyer: DUser): List<String>{
-        return buyOrders.mapNotNull {
-            if(it.value.first == buyer) {
-                it.key
+    override fun getMyBuyOrders(buyer: DUser): List<NftQuery>{
+        return buyOrders.mapNotNull { order ->
+            if(order.value.first == buyer) {
+                val nftQuery = TokenNftInfoQuery().setNftId(NftId(TokenId.fromString(order.key), 1)).execute(client)
+                nftQuery.map { NftQuery(order.key, it.metadata.decodeToString(), it.accountId.toString(), it.creationTime.epochSecond) }.first()
             }else {
                 null
             }
+        }
+    }
+
+    override fun getMyNft(user: DUser): List<NftQuery> {
+        val myNft = QDCredit().owner.eq(user).findList()
+        if (myNft.isEmpty()) return emptyList()
+        return myNft.flatMap { credit ->
+            val nftQuery = TokenNftInfoQuery().setNftId(NftId(TokenId.fromString(credit.tokenId), 1)).execute(client)
+            nftQuery.map { NftQuery(credit.tokenId, it.metadata.decodeToString(), it.accountId.toString(), it.creationTime.epochSecond) }
         }
     }
 
@@ -114,15 +125,16 @@ class NftManagerImpl(val treasury: Treasury, val supply: Supply, val client: Cli
         if (availableNfts.isEmpty()) return emptyList()
         return availableNfts.flatMap { credit ->
             val nftQuery = TokenNftInfoQuery().setNftId(NftId(TokenId.fromString(credit.tokenId), 1)).execute(client)
-            nftQuery.map { NftQuery(credit.tokenId, it.metadata.decodeToString(), it.accountId.toString()) }
+            nftQuery.map { NftQuery(credit.tokenId, it.metadata.decodeToString(), it.accountId.toString(), it.creationTime.epochSecond) }
         }
 
     }
 
-    override fun getMyAvailableOrders(seller: DUser): List<String>{
-        return seller.credits.mapNotNull {
-            if(buyOrders.containsKey(it.tokenId)){
-                it.tokenId
+    override fun getMyAvailableOrders(seller: DUser): List<NftQuery>{
+        return seller.credits.mapNotNull {credit ->
+            if(buyOrders.containsKey(credit.tokenId)){
+                val nftQuery = TokenNftInfoQuery().setNftId(NftId(TokenId.fromString(credit.tokenId), 1)).execute(client)
+                nftQuery.map { NftQuery(credit.tokenId, it.metadata.decodeToString(), it.accountId.toString(), it.creationTime.epochSecond) }.first()
             } else{
                 null
             }

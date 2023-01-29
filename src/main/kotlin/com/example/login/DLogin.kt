@@ -12,7 +12,6 @@ class DLogin(
     val password: String,
     @OneToOne
     var user: DUser? = null,
-    var organization: String? = null,
     )
 : AbstractIdEntity() {
 }

@@ -1,5 +1,8 @@
 package com.example.user
 
+import com.hedera.hashgraph.sdk.AccountBalanceQuery
+import com.hedera.hashgraph.sdk.AccountId
+import com.hedera.hashgraph.sdk.Client
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -9,11 +12,19 @@ import kotlinx.serialization.Serializable
 
 
 @Serializable
-data class HttpGetUser(
+data class HttpRegisterUser(
     val id: String,
     val firstName: String,
     val lastName: String,
     val mnemonic: String
+)
+
+@Serializable
+data class HttpGetUser(
+    val id: String,
+    val firstName: String,
+    val lastName: String,
+    val credits: String
 )
 @Serializable
 data class HttpPostSignup(
@@ -29,39 +40,22 @@ data class HttpGetUsers(val employees: List<HttpGetUser>)
 @Serializable
 data class HttpPostUserLogin(val email: String, val password: String)
 
-fun Route.userRoutes(userManager: UserManager, userRepository: UserRepository) {
+fun Route.userRoutes(userManager: UserManager, userRepository: UserRepository, client: Client) {
     route("/user") {
         get {
-            val userId = call.request.queryParameters["id"]
-            val firstName = call.request.queryParameters["firstName"]
-            val lastName = call.request.queryParameters["lastName"]
-
-            val users = if (!userId.isNullOrEmpty()) {
-                val user = userRepository.getByFirebaseId(userId) ?: return@get call.respondText(
-                    "No user found with id $userId",
-                    status = HttpStatusCode.OK
-                )
-                listOf(user)
-            } else if (!firstName.isNullOrEmpty() && !lastName.isNullOrEmpty()) {
-                userRepository.getByName(firstName, lastName)
-            } else {
-                return@get call.respondText(
-                    "Bad query params",
-                    status = HttpStatusCode.BadRequest
-                )
-            }
-            call.respond(
-                HttpGetUsers(
-                    users.map { user ->
-                        HttpGetUser(
-                            id = user.firebaseId,
-                            firstName = user.firstName,
-                            lastName = user.lastName,
-                            mnemonic = ""
-                        )
-                    }
-                )
+            val userId = call.request.queryParameters["id"] ?: return@get call.respondText("No user found with id", status = HttpStatusCode.BadRequest)
+            val user = userRepository.getByFirebaseId(userId) ?: return@get call.respondText(
+                "No user found with id $userId",
+                status = HttpStatusCode.OK
             )
+            val hbar = AccountBalanceQuery().setAccountId(AccountId.fromString(user.accountId)).execute(client).hbars.value.toString()
+            call.respond(
+                    HttpGetUser(
+                        id = user.firebaseId,
+                        firstName = user.firstName,
+                        lastName = user.lastName,
+                        credits = hbar)
+                )
         }
     }
     route("/register") {
@@ -83,7 +77,7 @@ fun Route.userRoutes(userManager: UserManager, userRepository: UserRepository) {
 
                 is UserManager.Result.Success -> {
                     return@post call.respond(
-                        HttpGetUser(
+                        HttpRegisterUser(
                             id = result.user.firebaseId,
                             firstName = result.user.firstName,
                             lastName = result.user.lastName,
