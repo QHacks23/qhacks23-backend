@@ -42,13 +42,13 @@ fun Route.nftRoutes(nftManager: NftManager, userRepository: UserRepository) {
             call.respondText("Nft was successfully created for ${user.firstName}", status = HttpStatusCode.OK)
         }
 
-        post("/sell"){
-            val sell = call.receive<HttpPostSellAvailability>()
-            val user = userRepository.getByFirebaseId(sell.userId) ?: return@post call.respondText("User could not be resolved from id", status = HttpStatusCode.BadRequest)
-            val credit = QDCredit().tokenId.eq(sell.tokenId).findOne() ?:  return@post call.respondText("Could not find token", status = HttpStatusCode.BadRequest)
-            nftManager.setCreditAvailability(sell.bool, user, credit)
-            call.respondText("Nft was successfully changed to for ${sell.bool}", status = HttpStatusCode.OK)
-        }
+//        post("/sell"){
+//            val sell = call.receive<HttpPostSellAvailability>()
+//            val user = userRepository.getByFirebaseId(sell.userId) ?: return@post call.respondText("User could not be resolved from id", status = HttpStatusCode.BadRequest)
+//            val credit = QDCredit().tokenId.eq(sell.tokenId).findOne() ?:  return@post call.respondText("Could not find token", status = HttpStatusCode.BadRequest)
+//            nftManager.setCreditAvailability(sell.bool, user, credit)
+//            call.respondText("Nft was successfully changed to for ${sell.bool}", status = HttpStatusCode.OK)
+//        }
 
         get("/balance"){
             val id = call.request.queryParameters["id"] ?: return@get call.respondText("User id was null", status = HttpStatusCode.BadRequest)
